@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""
+A fake `oci` CLI used only for local testing of oci_shepherd.py's
+obtain loop, without needing real OCI credentials or a network call.
+
+Behavior, driven by the AD name passed to `compute instance launch`:
+  - name containing "AD-1" -> simulate "out of host capacity" (exit 1)
+  - name containing "AD-2" -> simulate a 429 rate limit on the first call,
+                               then succeed on retry
+  - anything else          -> simulate success (exit 0, RUNNING instance)
+
+Also answers `iam availability-domain list` and `compute image list` with
+canned JSON so the full obtain_loop() path (AD resolution, image
+resolution, launch) can run end to end against config.example.yaml-shaped
+config without touching the network.
+"""
+import json
+import sys
+from pathlib import Path
+
+STATE_FILE = Path(__file__).parent / "fake_oci_state.json"
+
+
+def load_call_count():
+    if STATE_FILE.is_file():
+        return json.loads(STATE_FILE.read_text())
+    return {}
+
+
+def save_call_count(counts):
+    STATE_FILE.write_text(json.dumps(counts))
+
+
+def main():
+    args = sys.argv[1:]
+
+    if "availability-domain" in args and "list" in args:
+        print(json.dumps({
+            "data": [
+                {"name": "EXAMPLE:US-ASHBURN-AD-1"},
+                {"name": "EXAMPLE:US-ASHBURN-AD-2"},
+                {"name": "EXAMPLE:US-ASHBURN-AD-3"},
+            ]
+        }))
+        return 0
+
+    if "image" in args and "list" in args:
+        print(json.dumps({
+            "data": [{"id": "ocid1.image.oc1..aaaaaaaafakeimageforlocaltesting"}]
+        }))
+        return 0
+
+    if "instance" in args and "launch" in args:
+        ad = args[args.index("--availability-domain") + 1]
+
+        if "AD-1" in ad:
+            sys.stderr.write(json.dumps({
+                "code": "InternalError",
+                "message": "Out of host capacity for shape in this availability domain.",
+            }))
+            return 1
+
+        if "AD-2" in ad:
+            counts = load_call_count()
+            n = counts.get(ad, 0) + 1
+            counts[ad] = n
+            save_call_count(counts)
+            if n == 1:
+                sys.stderr.write(json.dumps({
+                    "code": "TooManyRequests",
+                    "message": "429 Too many requests",
+                }))
+                return 1
+
+        print(json.dumps({
+            "data": {
+                "id": "ocid1.instance.oc1..aaaaaaaafakeinstanceforlocaltesting",
+                "lifecycle-state": "RUNNING",
+            }
+        }))
+        return 0
+
+    if "instance" in args and "get" in args:
+        print(json.dumps({
+            "data": {"lifecycle-state": "RUNNING"}
+        }))
+        return 0
+
+    sys.stderr.write(f"fake_oci: unhandled args {args}\n")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

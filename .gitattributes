@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+*.py text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.service text eol=lf
+*.md text eol=lf
+test/fake_oci text eol=lf

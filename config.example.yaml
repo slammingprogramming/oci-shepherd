@@ -1,0 +1,149 @@
+# oci-shepherd configuration
+#
+# Copy this file to config.yaml (or /etc/oci-shepherd/config.yaml
+# for the systemd install) and fill in your own tenancy's values. Every
+# OCID below is a fake placeholder - replace them all.
+#
+# NOTE: when uncommenting an optional line below, delete only the leading
+# '#' character. If a stray space is left in front of the key (e.g.
+# " image_id: ..." instead of "image_id: ..."), YAML will fail to parse
+# with an indentation error.
+#
+# This tool does NOT read or manage OCI credentials. It calls the `oci` CLI,
+# which must already be authenticated on this machine (`~/.oci/config`, or
+# OCI_CLI_* environment variables) exactly as if you were running `oci` by
+# hand. Test that first:
+#     oci iam availability-domain list --compartment-id <your compartment OCID>
+
+# --- Identity / region -------------------------------------------------
+
+# The OCI region to operate in, e.g. us-ashburn-1, uk-london-1, eu-frankfurt-1.
+region: us-ashburn-1
+
+# Optional: an OCI CLI profile name from ~/.oci/config to use instead of
+# DEFAULT. Leave unset (or remove the line) to use the CLI's default profile.
+# profile: DEFAULT
+
+# The compartment OCID to launch the instance into. To launch into the
+# tenancy's root compartment, use your tenancy OCID here instead
+# (starts with "ocid1.tenancy." rather than "ocid1.compartment.") - OCI
+# treats the tenancy OCID as the root compartment's identifier.
+compartment_id: ocid1.compartment.oc1..aaaaaaaaexampleexampleexampleexampleexampleexampleexampleexa
+
+# --- Shape ---------------------------------------------------------------
+
+# Always Free eligible shapes:
+#   VM.Standard.E2.1.Micro   - AMD, fixed 1 OCPU / 1 GB RAM, no shape_config needed
+#   VM.Standard.A1.Flex      - Ampere ARM, flexible OCPU/RAM, requires shape_config
+#                              below (Always Free limit: up to 4 OCPUs / 24 GB RAM
+#                              total across all A1 instances in a tenancy)
+shape: VM.Standard.A1.Flex
+
+# Required only when shape ends in ".Flex". Stay within your tenancy's
+# Always Free A1 limits (commonly 4 OCPUs / 24 GB total).
+shape_config:
+  ocpus: 4
+  memory_in_gbs: 24
+
+# --- Availability domains -------------------------------------------------
+
+# Which ADs in the target region to cycle through between launch attempts.
+# Capacity errors are AD-specific, so trying every AD in the region gives
+# the best chance of success. Use ["all"] to auto-discover every AD in the
+# region/compartment, or list specific ADs explicitly, e.g.:
+#   availability_domains:
+#     - "abCD:US-ASHBURN-AD-1"
+#     - "abCD:US-ASHBURN-AD-2"
+#     - "abCD:US-ASHBURN-AD-3"
+availability_domains:
+  - all
+
+# --- Networking ------------------------------------------------------------
+
+# Subnet OCID to attach the instance's primary VNIC to. This tool does not
+# create VCNs/subnets - create one first (Always Free includes 2 VCNs).
+subnet_id: ocid1.subnet.oc1..aaaaaaaaexampleexampleexampleexampleexampleexampleexampleexampl
+
+# Whether to assign a public (ephemeral) IP to the instance. true/false.
+assign_public_ip: true
+
+# --- Image -----------------------------------------------------------------
+
+# Option A: pin an exact image OCID (recommended for reproducibility).
+# image_id: ocid1.image.oc1..aaaaaaaaexampleexampleexampleexampleexampleexampleexampleexamp
+
+# Option B: leave image_id unset/commented and resolve the newest matching
+# image by OS name + version instead. Both fields below are required if
+# image_id is not set. Run `oci compute image list --compartment-id <ocid>
+# --shape <shape>` to see what's available in your region.
+image_operating_system: "Canonical Ubuntu"
+image_operating_system_version: "22.04"
+
+# --- SSH access --------------------------------------------------------
+
+# Path to a public key file (recommended), OR set ssh_public_key inline
+# instead. Exactly one of the two is required.
+ssh_public_key_path: ~/.ssh/id_ed25519.pub
+# ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... you@example.com"
+
+# --- Instance ----------------------------------------------------------
+
+# Display name given to the launched instance.
+display_name: always-free-instance
+
+# Boot volume size in GB. Always Free total boot volume allowance is 200 GB
+# across all boot + block volumes combined.
+boot_volume_size_in_gbs: 50
+
+# --- Timing / retry behavior ---------------------------------------------
+
+# How long to wait, in seconds, after a full pass through every availability
+# domain before starting another pass (obtain mode). Community reports for
+# A1 capacity commonly range from minutes to weeks depending on region/AD,
+# so this can safely be a few minutes without meaningfully slowing things
+# down - see README.md's troubleshooting section.
+obtain_retry_interval_seconds: 60
+
+# How long to wait between trying each individual AD within a single pass.
+obtain_inter_ad_delay_seconds: 5
+
+# How long, in seconds, to wait for the instance to reach RUNNING state
+# after a launch call succeeds before giving up on that attempt.
+wait_for_running_seconds: 600
+
+# How often, in seconds, monitor mode polls the instance's state once obtained.
+monitor_check_interval_seconds: 300
+
+# --- Rate limit (HTTP 429) backoff ----------------------------------------
+
+# Base and max delay, in seconds, for exponential backoff (with jitter) when
+# the OCI API returns HTTP 429 Too Many Requests. Delay doubles on each
+# consecutive 429 for the same availability domain, up to the max, then a
+# random 0-30% jitter is added. This is separate from obtain_retry_interval_seconds,
+# which governs normal "no capacity" retries.
+rate_limit_backoff_base_seconds: 30
+rate_limit_backoff_max_seconds: 900
+
+# How many consecutive 429s on the same availability domain to tolerate
+# (backing off between each) before giving up on that AD for this pass and
+# moving on to the next one. Optional, defaults to 8.
+rate_limit_max_consecutive_retries: 8
+
+# --- Logging / state -----------------------------------------------------
+
+# Structured JSON Lines log of every attempt (timestamp, AD, shape, outcome,
+# error detail). The parent directory is created automatically if missing.
+log_file: /var/log/oci-shepherd/activity.jsonl
+
+# Where the tool records the obtained instance's OCID so monitor mode (a
+# separate process) knows what to watch. The parent directory is created
+# automatically if missing.
+state_file: /var/lib/oci-shepherd/state.json
+
+# --- systemd handoff -------------------------------------------------------
+
+# Unit names this tool runs `systemctl start <unit>` on to hand off between
+# modes. Only relevant if you used different unit names than the ones
+# shipped in systemd/. Change these if you renamed the unit files.
+obtain_systemd_unit: oci-shepherd-obtain.service
+monitor_systemd_unit: oci-shepherd-monitor.service

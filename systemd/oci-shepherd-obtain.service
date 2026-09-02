@@ -1,0 +1,40 @@
+[Unit]
+Description=OCI Shepherd - obtain an Always Free compute instance
+After=network-online.target
+Wants=network-online.target
+# StartLimitIntervalSec/StartLimitBurst are [Unit]-section directives (not
+# [Service]), despite governing Restart= behavior below. 0 disables the
+# limit entirely - this loop is expected to legitimately restart on
+# transient crashes for as long as it takes to get capacity, which can be
+# weeks, so we don't want systemd to give up and stop restarting it.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/oci-shepherd/oci_shepherd.py obtain --config /etc/oci-shepherd/config.yaml
+# On every start (including after a host reboot), the script first checks
+# its state file: if it already points at a still-running instance, it
+# hands off straight to the monitor unit instead of launching a redundant
+# one. Otherwise it loops, retrying every availability domain at the
+# configured interval, until it succeeds and hands off to the monitor unit,
+# or hits a fatal, non-retryable error (e.g. bad config/auth).
+# Restart=on-failure covers unexpected crashes; it will not fire on the
+# clean success-path exit(0).
+Restart=on-failure
+RestartSec=60
+
+# Runs as root by default so it can call `systemctl start
+# oci-shepherd-monitor.service` on success without extra polkit/sudoers
+# setup, and so it picks up /root/.oci/config for OCI CLI auth.
+#
+# To run as a non-root user instead, uncomment the two lines below (and
+# make sure that user's ~/.oci/config is authenticated), then either grant
+# that user passwordless `systemctl start/stop` on both
+# oci-shepherd-obtain.service and oci-shepherd-monitor.service via polkit
+# or sudoers, or ignore the automatic handoff and trigger the monitor unit
+# yourself.
+# User=oci-shepherd
+# Environment=HOME=/home/oci-shepherd
+
+[Install]
+WantedBy=multi-user.target

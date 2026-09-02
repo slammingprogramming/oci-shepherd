@@ -1,0 +1,27 @@
+[Unit]
+Description=OCI Shepherd - monitor an obtained instance
+After=network-online.target
+Wants=network-online.target
+# See oci-shepherd-obtain.service for why this lives in [Unit] and why the
+# limit is disabled.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/oci-shepherd/oci_shepherd.py monitor --config /etc/oci-shepherd/config.yaml
+# The script loops internally (polling at monitor_check_interval_seconds)
+# and only exits when either the instance disappears (having handed off to
+# the obtain unit) or it hits a fatal error. Restart=on-failure covers
+# unexpected crashes; it will not fire on the clean handoff exit(0).
+Restart=on-failure
+RestartSec=60
+
+# See oci-shepherd-obtain.service for notes on running as a non-root user.
+# User=oci-shepherd
+# Environment=HOME=/home/oci-shepherd
+
+# Deliberately no [Install] section: do NOT `systemctl enable` this unit.
+# It has nothing to watch until an instance has been obtained, so starting
+# it at boot would just fail in a loop. oci-shepherd-obtain.service starts
+# it automatically on success (and again on every boot if it finds a still
+# -live instance in the state file), so enabling obtain is sufficient.

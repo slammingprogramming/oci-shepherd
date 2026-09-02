@@ -1,0 +1,38 @@
+# Your real config - never commit real OCIDs/tenancy details.
+config.yaml
+
+# Runtime state this tool produces, not source.
+*.jsonl
+state.json
+selftest*.jsonl
+test/fake_oci_state.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.mypy_cache/
+.pytest_cache/
+.venv/
+venv/
+
+# Editor/OS cruft
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# AI-agent state/config: never belongs in the public repo. This is a
+# public-facing GitHub repo - agent scratch files, memory, and project
+# instructions may exist in the private (Keybase) copy of this project but
+# must never leak here. If you're setting up the private repo and want
+# these tracked there, remove this block from that copy's .gitignore -
+# don't remove it from the public one.
+.claude/
+CLAUDE.md
+AGENT.md
+AGENTS.md
+MEMORY.md
+.cursor/
+.windsurf/

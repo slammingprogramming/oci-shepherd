@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: python3 -m pip install -r requirements.txt
+
+      - name: Byte-compile
+        run: python3 -m py_compile oci_shepherd.py test/run_local_test.py test/fake_oci
+
+      - name: Validate config.example.yaml is well-formed YAML
+        run: |
+          python3 -c "
+          import yaml
+          with open('config.example.yaml') as f:
+              cfg = yaml.safe_load(f)
+          assert isinstance(cfg, dict), 'config.example.yaml did not parse to a mapping'
+          print('OK -', len(cfg), 'top-level keys')
+          "
+
+      - name: Self-test (canned outcome classification + logging)
+        run: python3 oci_shepherd.py selftest --log-file ./selftest.jsonl
+
+      - name: Mocked end-to-end obtain/monitor test
+        run: python3 test/run_local_test.py
+
+  systemd-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # systemd-analyze verify also checks that ExecStart binaries exist,
+      # which they won't on a CI runner (they're installed to
+      # /opt/oci-shepherd by the README's install steps, not
+      # present here). continue-on-error keeps that expected noise from
+      # blocking the pipeline while still surfacing real unit-syntax
+      # errors in the step's log/annotations for a human to check.
+      - name: systemd-analyze verify
+        continue-on-error: true
+        run: |
+          for unit in systemd/*.service; do
+            echo "== $unit =="
+            systemd-analyze verify --recursive-errors=yes "$unit"
+          done
