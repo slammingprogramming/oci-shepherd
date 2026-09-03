@@ -2,9 +2,15 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
+
+# Least-privilege default: neither job writes to the repo, comments on
+# PRs, or publishes anything - both only need read access to check out
+# the code, so this is as narrow as GITHUB_TOKEN permissions get here.
+permissions:
+  contents: read
 
 jobs:
   test:

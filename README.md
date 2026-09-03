@@ -2,6 +2,12 @@
 
 [![CI](https://github.com/slammingprogramming/oci-shepherd/actions/workflows/ci.yml/badge.svg)](https://github.com/slammingprogramming/oci-shepherd/actions/workflows/ci.yml)
 [![License: AGPL v3 or later](https://img.shields.io/badge/License-AGPL%20v3%20or%20later-blue.svg)](LICENSE)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![Platform: Linux (systemd)](https://img.shields.io/badge/platform-linux%20%28systemd%29-lightgrey.svg)](#requirements)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Security Policy](https://img.shields.io/badge/security-policy-blue.svg)](SECURITY.md)
+[![Open issues](https://img.shields.io/github/issues/slammingprogramming/oci-shepherd.svg)](https://github.com/slammingprogramming/oci-shepherd/issues)
 
 Automates getting and keeping an Oracle Cloud Infrastructure (OCI) "Always
 Free" compute instance, for any Always Free-eligible shape you configure
@@ -32,6 +38,17 @@ by hand after the initial setup.
 **Out of scope:** this tool's job ends the moment the compute instance
 exists and is `RUNNING`. It does not touch the instance's OS, networking,
 or any software on it.
+
+## Table of Contents
+
+- [How it works](#how-it-works)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Config reference](#config-reference)
+- [Testing without a live OCI account](#testing-without-a-live-oci-account)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## How it works
 
